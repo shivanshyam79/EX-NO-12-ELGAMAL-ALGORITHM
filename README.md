@@ -1,33 +1,123 @@
-# EX-NO-12-ELGAMAL-ALGORITHM
+# EX-NO-11-ELLIPTIC-CURVE-CRYPTOGRAPHY-ECC
 
-## AIM:
-To Implement ELGAMAL ALGORITHM
+## Aim:
+To Implement ELLIPTIC CURVE CRYPTOGRAPHY(ECC)
+
 
 ## ALGORITHM:
 
-1. ElGamal Algorithm is a public-key cryptosystem based on the Diffie-Hellman key exchange and relies on the difficulty of solving the discrete logarithm problem.
+1. Elliptic Curve Cryptography (ECC) is a public-key cryptography technique based on the algebraic structure of elliptic curves over finite fields.
 
 2. Initialization:
-   - Select a large prime \( p \) and a primitive root \( g \) modulo \( p \) (these are public values).
-   - The receiver chooses a private key \( x \) (a random integer), and computes the corresponding public key \( y = g^x \mod p \).
+   - Select an elliptic curve equation \( y^2 = x^3 + ax + b \) with parameters \( a \) and \( b \), along with a large prime \( p \) (defining the finite field).
+   - Choose a base point \( G \) on the curve, which will be used for generating public keys.
 
 3. Key Generation:
-   - The public key is \( (p, g, y) \), and the private key is \( x \).
+   - Each party selects a private key \( d \) (a random integer).
+   - Calculate the public key as \( Q = d \times G \) (using elliptic curve point multiplication).
 
-4. Encryption:
-   - The sender picks a random integer \( k \), computes \( c_1 = g^k \mod p \), and \( c_2 = m \times y^k \mod p \), where \( m \) is the message.
-   - The ciphertext is the pair \( (c_1, c_2) \).
+4. Encryption and Decryption:
+   - Encryption: The sender uses the recipient’s public key and the base point \( G \) to encode the message.
+   - Decryption: The recipient uses their private key to decode the message and retrieve the original plaintext.
 
-5. Decryption:
-   - The receiver computes \( s = c_1^x \mod p \), and then calculates the plaintext message \( m = c_2 \times s^{-1} \mod p \), where \( s^{-1} \) is the modular inverse of \( s \).
-
-6. Security: The security of the ElGamal algorithm relies on the difficulty of solving the discrete logarithm problem in a large prime field, making it secure for encryption.
+5. Security: ECC’s security relies on the Elliptic Curve Discrete Logarithm Problem (ECDLP), making it highly secure with shorter key lengths compared to traditional methods like RSA.
 
 ## Program:
+```
+#include <stdio.h>
+
+typedef struct {
+    long long int x, y;
+} Point;
+
+long long int modInverse(long long int a, long long int m) {
+    long long int m0 = m, t, q;
+    long long int x0 = 0, x1 = 1;
+    if (m == 1) return 0;
+    a = (a % m + m) % m;
+    while (a > 1) {
+        q = a / m;
+        t = m;
+        m = a % m, a = t;
+        t = x0;
+        x0 = x1 - q * x0;
+        x1 = t;
+    }
+    if (x1 < 0) x1 += m0;
+    return x1;
+}
+
+Point pointAddition(Point P, Point Q, long long int a, long long int p) {
+    Point R;
+    long long int lambda, num, den;
+    if (P.x == 0 && P.y == 0) return Q;
+    if (Q.x == 0 && Q.y == 0) return P;
+    if (P.x == Q.x && (P.y + Q.y) % p == 0) return (Point){0, 0};
+    if (P.x == Q.x && P.y == Q.y) {
+        num = (3 * P.x * P.x + a) % p;
+        den = (2 * P.y) % p;
+    } else {
+        num = (Q.y - P.y) % p;
+        den = (Q.x - P.x) % p;
+    }
+    den = modInverse(den, p);
+    lambda = (num * den) % p;
+    lambda = (lambda + p) % p;
+    R.x = (lambda * lambda - P.x - Q.x) % p;
+    R.y = (lambda * (P.x - R.x) - P.y) % p;
+    R.x = (R.x + p) % p;
+    R.y = (R.y + p) % p;
+    return R;
+}
+
+Point scalarMultiplication(Point P, long long int k, long long int a, long long int p) {
+    Point R = {0, 0};
+    while (k > 0) {
+        if (k % 2 == 1)
+            R = pointAddition(R, P, a, p);
+        P = pointAddition(P, P, a, p);
+        k = k / 2;
+    }
+    return R;
+}
+
+int main() {
+    long long int p, a, b, privateA, privateB;
+    Point G, publicA, publicB, sharedA, sharedB;
+    printf("Enter the prime number (p): ");
+    scanf("%lld", &p);
+    printf("Enter the curve parameters (a and b) for equation y^2 = x^3 + ax + b: ");
+    scanf("%lld %lld", &a, &b);
+    printf("Enter the base point G (x and y): ");
+    scanf("%lld %lld", &G.x, &G.y);
+    printf("Enter Alice's private key: ");
+    scanf("%lld", &privateA);
+    printf("Enter Bob's private key: ");
+    scanf("%lld", &privateB);
+    publicA = scalarMultiplication(G, privateA, a, p);
+    publicB = scalarMultiplication(G, privateB, a, p);
+    printf("\n=== Public Keys ===\n");
+    printf("Alice's Public Key A = aG = (%lld, %lld)\n", publicA.x, publicA.y);
+    printf("Bob's Public Key   B = bG = (%lld, %lld)\n", publicB.x, publicB.y);
+    sharedA = scalarMultiplication(publicB, privateA, a, p);
+    sharedB = scalarMultiplication(publicA, privateB, a, p);
+    printf("\n=== Shared Secrets ===\n");
+    printf("Alice computes S = aB = (%lld, %lld)\n", sharedA.x, sharedA.y);
+    printf("Bob computes   S = bA = (%lld, %lld)\n", sharedB.x, sharedB.y);
+    if (sharedA.x == sharedB.x && sharedA.y == sharedB.y)
+        printf("\nKey exchange successful ✅ Both shared secrets match!\n");
+    else
+        printf("\nKey exchange failed ❌ Shared secrets do not match.\n");
+    return 0;
+}
+```
+
 
 
 ## Output:
 
+<img width="3839" height="1861" alt="image" src="https://github.com/user-attachments/assets/fb56fd52-b016-4097-899d-243685d292a4" />
 
 ## Result:
-The program is executed successfully.
+The program is executed successfully
+
